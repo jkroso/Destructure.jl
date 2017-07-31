@@ -1,7 +1,7 @@
-import MacroTools.flatten
+import MacroTools: flatten, @capture, longdef
 
 macro assign(pattern, data)
-  flatten(gen_expr(pattern, data))
+  flatten(gen_expr(pattern, esc(data)))
 end
 
 gen_expr(p::Expr, data) = begin
@@ -91,3 +91,18 @@ end
 getkey(a::Associative, key, default) = get(a, key, default)
 getkey(object, key, default) = isdefined(object, key::Symbol) ? getfield(object, key) : default
 getkey(t::Tuple, i, default) = isdefined(t, i) ? getindex(t, i) : default
+
+macro assign(fn)
+  @capture(longdef(fn), function f_(args__) body_ end)
+  extra = quote end
+  for (i, param) in enumerate(args)
+    pattern, T = norm_param(param)
+    pattern isa Symbol && continue
+    temp = gensym()
+    push!(extra.args, gen_expr(pattern, esc(temp)))
+    args[i] = :($temp::$T)
+  end
+  :($(esc(f))($(map(esc, args)...)) = ($extra; $(esc(body)))) |> flatten
+end
+
+norm_param(e) = Meta.isexpr(e, :(::), 2) ? (e.args[1], e.args[2]) : (e, Any)

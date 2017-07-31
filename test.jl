@@ -26,3 +26,6 @@ include("main.jl")
 
 @assign [:a=>a=1] Dict()
 @test a == 1
+
+@assign destruct([:a=>a]::Dict,b) = (a,b)
+@test destruct(Dict(:a=>1),2) == (1,2)
