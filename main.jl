@@ -1,6 +1,8 @@
 import MacroTools.flatten
 
-macro assign(pattern, data) flatten(gen_expr(pattern, data)) end
+macro assign(pattern, data)
+  flatten(gen_expr(pattern, data))
+end
 
 gen_expr(p::Expr, data) = begin
   @assert Meta.isexpr(p, :vect)
@@ -18,7 +20,9 @@ gen_expr(p::Symbol, data) = p == :_ ? nothing : :($(esc(p)) = $data)
 gen_associative(p, data) = begin
   exprs = map(p.args) do arg
     if Meta.isexpr(arg, :...)
-      gen_expr(arg.args[1], :(without(Any[$(findnames(p.args)...)], $data)))
+      gen_expr(arg.args[1], :(without([$(findnames(p.args)...)], $data)))
+    elseif Meta.isexpr(arg.args[3], :(=), 2)
+      gen_expr(arg.args[3].args[1], :(getkey($data, $(arg.args[2]), $(arg.args[3].args[2]))))
     else
       gen_expr(arg.args[3], :(getkey($data, $(arg.args[2]))))
     end

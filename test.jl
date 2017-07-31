@@ -1,3 +1,4 @@
+using Base.Test
 include("main.jl")
 
 @assign [:a=>a] Dict(:a=>1)
@@ -22,3 +23,6 @@ include("main.jl")
 
 @assign [:num=>num,:den=>den, tail...] 1//2
 @test num == 1 && den == 2 && tail == Dict()
+
+@assign [:a=>a=1] Dict()
+@test a == 1
