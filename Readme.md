@@ -13,8 +13,8 @@ With [Kip.jl](//github.com/jkroso/Kip.jl)
 Otherwise
 
 ```julia
-Pkg.clone("https://github.com/jkroso/Descructure.jl")
-using Descructure
+Pkg.clone("https://github.com/jkroso/Destructure.jl")
+using Destructure
 ```
 
 ## Usage
