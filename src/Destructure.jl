@@ -1,4 +1,4 @@
 module Destructure
 include("../main.jl")
-export @assign
+export @destruct, @const
 end
