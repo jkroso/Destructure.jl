@@ -1,4 +1,4 @@
-import MacroTools: flatten, @capture, longdef
+import MacroTools: flatten, @capture, @match
 
 @eval macro $:const(expr)
   @capture(expr, pattern_ = data_) || error("not an assignment expression")
@@ -6,13 +6,25 @@ import MacroTools: flatten, @capture, longdef
 end
 
 gen_expr(p::Expr, data, isconst=true) = begin
+  # convert {a,b} => [:a=>a,:b=>b]
+  if Meta.isexpr(p, :cell1d)
+    pairs = map(p.args) do e
+      @match e begin
+        (s_Symbol)          => :($(QuoteNode(s)) => $s)
+        (s_Symbol = value_) => :($(QuoteNode(s)) => $e)
+        _ => e
+      end
+    end
+    p = :([$(pairs...)])
+  end
   @assert Meta.isexpr(p, :vect)
   temp = gensym(:data)
-  quote
-    const $temp = $data
-    $(if any(ispair, p.args) gen_associative(p, temp, isconst)
-      else gen_iteratable(p, temp, isconst) end)
+  expr = if any(ispair, p.args)
+    gen_associative(p, temp, isconst)
+  else
+    gen_iteratable(p, temp, isconst)
   end
+  :(const $temp = $data; $expr)
 end
 
 gen_expr(p::Symbol, data, isconst=true) = p == :_ ? nothing : Expr(isconst ? :const : :block, :($(esc(p)) = $data))

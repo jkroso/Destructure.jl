@@ -32,26 +32,26 @@ using Destructure
 It works on `Associative` like objects too:
 
 ```julia
-@destruct [:a=>a, rest...] = Dict(:a=>1,:b=>2)
+@destruct {a, rest...} = Dict(:a=>1,:b=>2)
 @assert a == 1 && rest == Dict(:b=>2)
 # It treats objects like Associative's
-@destruct [:num=>num, :den=>den, rest...] = 1//2
+@destruct {num, den, rest...} = 1//2
 @assert num == 1 && den == 2 && rest == Dict()
 # Default values work with Associative's
-@destruct [:a=>a=0] = Dict()
+@destruct {a=0} = Dict()
 @assert a == 0
 ```
 
 And it's recursive so you can go several levels down into objects to get what you want. And `@const` is just like `@destruct` except it declares all variables with `const`.
 
 ```julia
-@const [_, [:a=>[b]]] [1, Dict(:a=>[2])]
+@const [_, {:a=>[b]}] = [1, Dict(:a=>[2])]
 @assert b == 2 && isconst(:b)
 ```
 
 And you can use it in your function's parameters:
 
 ```julia
-@destruct name([:name=>n]::Dict) = n
+@destruct name({name}::Dict) = name
 @assert name(Dict(:name=>"Jake")) == "Jake"
 ```
