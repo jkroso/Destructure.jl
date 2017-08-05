@@ -1,4 +1,4 @@
-import MacroTools: flatten, @capture, @match
+@require "github.com/MikeInnes/MacroTools.jl" => MacroTools flatten @capture @match
 
 @eval macro $:const(expr)
   @capture(expr, pattern_ = data_) || error("not an assignment expression")
