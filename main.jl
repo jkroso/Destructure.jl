@@ -31,12 +31,11 @@ gen_expr(p::Symbol, data, isconst=true) = p == :_ ? nothing : Expr(isconst ? :co
 
 gen_associative(p, data, isconst) = begin
   exprs = map(p.args) do arg
-    if Meta.isexpr(arg, :...)
-      gen_expr(arg.args[1], :(without([$(findnames(p.args)...)], $data)), isconst)
-    elseif Meta.isexpr(arg.args[3], :(=), 2)
-      gen_expr(arg.args[3].args[1], :(getkey($data, $(arg.args[2]), $(arg.args[3].args[2]))), isconst)
-    else
-      gen_expr(arg.args[3], :(getkey($data, $(arg.args[2]))), isconst)
+    @match arg begin
+      (key_ => pat_ = default_) => gen_expr(pat, :(getkey($data, $(esc(key)), $(esc(default)))), isconst)
+      (key_ => pat_) => gen_expr(pat, :(getkey($data, $(esc(key)))), isconst)
+      slurp_... => gen_expr(slurp, :(without([$(findnames(p.args)...)], $data)), isconst)
+      _ => error("unknown format $arg")
     end
   end
   quote $(exprs...) end
