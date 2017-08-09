@@ -1,11 +1,6 @@
 @require "github.com/MikeInnes/MacroTools.jl" => MacroTools flatten @capture @match
 @require "github.com/jkroso/Prospects.jl" get
 
-@eval macro $:const(expr)
-  @capture(expr, pattern_ = data_) || error("not an assignment expression")
-  flatten(gen_expr(pattern, esc(data), :const))
-end
-
 gen_expr(p::Expr, data, dec) = begin
   # convert {a,b} => [:a=>a,:b=>b]
   if Meta.isexpr(p, :cell1d)
@@ -25,7 +20,7 @@ gen_expr(p::Expr, data, dec) = begin
   else
     gen_iteratable(p, temp, dec)
   end
-  :(const $temp = $data; $expr)
+  :($temp = $data; $expr)
 end
 
 gen_expr(p::Symbol, data, dec) = p == :_ ? nothing : Expr(dec, :($(esc(p)) = $data))
@@ -53,7 +48,7 @@ gen_iteratable(p, data, dec) = begin
       else
         remain = length(p.args) - i
         code = quote
-          const temp = rest($data, $state)
+          temp = rest($data, $state)
           $(gen_expr(arg.args[1], :(temp[1:end-$remain]), dec))
           tail = temp[end-$remain+1:end]
         end
@@ -65,7 +60,7 @@ gen_iteratable(p, data, dec) = begin
       break
     else
       push!(expr.args, quote
-        item, $state = next($data, $state)
+        (item, $state) = next($data, $state)
         $(gen_expr(arg, :item, dec))
       end)
     end
@@ -94,22 +89,26 @@ rest(itr, state) = begin
   out
 end
 
-macro destruct(expr)
+norm_param(e) = Meta.isexpr(e, :(::), 2) ? (e.args[1], e.args[2]) : (e, Any)
+
+handle_macro(expr, declaration) = begin
   if @capture(expr, function f_(args__) body_ end | f_(args__)=body_)
     extra = quote end
     for (i, param) in enumerate(args)
       pattern, T = norm_param(param)
       pattern isa Symbol && continue
       temp = gensym()
-      push!(extra.args, gen_expr(pattern, esc(temp), :block))
+      push!(extra.args, gen_expr(pattern, esc(temp), :local))
       args[i] = :($temp::$T)
     end
     :($(esc(f))($(map(esc, args)...)) = ($extra; $(esc(body)))) |> flatten
   elseif @capture(expr, pattern_ = data_)
-    flatten(gen_expr(pattern, esc(data), :block))
+    flatten(gen_expr(pattern, esc(data), declaration))
   else
     error("unrecognised input: $expr")
   end
 end
 
-norm_param(e) = Meta.isexpr(e, :(::), 2) ? (e.args[1], e.args[2]) : (e, Any)
+@eval macro $:const(expr) handle_macro(expr, :const) end
+@eval macro $:local(expr) handle_macro(expr, :local) end
+@eval macro $:destruct(expr) handle_macro(expr, :block) end
