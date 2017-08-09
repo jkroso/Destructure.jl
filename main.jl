@@ -1,11 +1,12 @@
 @require "github.com/MikeInnes/MacroTools.jl" => MacroTools flatten @capture @match
+@require "github.com/jkroso/Prospects.jl" get
 
 @eval macro $:const(expr)
   @capture(expr, pattern_ = data_) || error("not an assignment expression")
-  flatten(gen_expr(pattern, esc(data)))
+  flatten(gen_expr(pattern, esc(data), :const))
 end
 
-gen_expr(p::Expr, data, isconst=true) = begin
+gen_expr(p::Expr, data, dec) = begin
   # convert {a,b} => [:a=>a,:b=>b]
   if Meta.isexpr(p, :cell1d)
     pairs = map(p.args) do e
@@ -20,44 +21,44 @@ gen_expr(p::Expr, data, isconst=true) = begin
   @assert Meta.isexpr(p, :vect)
   temp = gensym(:data)
   expr = if any(ispair, p.args)
-    gen_associative(p, temp, isconst)
+    gen_associative(p, temp, dec)
   else
-    gen_iteratable(p, temp, isconst)
+    gen_iteratable(p, temp, dec)
   end
   :(const $temp = $data; $expr)
 end
 
-gen_expr(p::Symbol, data, isconst=true) = p == :_ ? nothing : Expr(isconst ? :const : :block, :($(esc(p)) = $data))
+gen_expr(p::Symbol, data, dec) = p == :_ ? nothing : Expr(dec, :($(esc(p)) = $data))
 
-gen_associative(p, data, isconst) = begin
+gen_associative(p, data, dec) = begin
   exprs = map(p.args) do arg
     @match arg begin
-      (key_ => pat_ = default_) => gen_expr(pat, :(getkey($data, $(esc(key)), $(esc(default)))), isconst)
-      (key_ => pat_) => gen_expr(pat, :(getkey($data, $(esc(key)))), isconst)
-      slurp_... => gen_expr(slurp, :(without([$(findnames(p.args)...)], $data)), isconst)
+      (key_ => pat_ = default_) => gen_expr(pat, :(get($data, $(esc(key)), $(esc(default)))), dec)
+      (key_ => pat_) => gen_expr(pat, :(get($data, $(esc(key)))), dec)
+      slurp_... => gen_expr(slurp, :(without([$(findnames(p.args)...)], $data)), dec)
       _ => error("unknown format $arg")
     end
   end
   quote $(exprs...) end
 end
 
-gen_iteratable(p, data, isconst) = begin
+gen_iteratable(p, data, dec) = begin
   state = gensym(:state)
   expr = quote $state = start($data) end
   for i in 1:length(p.args)
     arg = p.args[i]
     if Meta.isexpr(arg, :...)
       if i == length(p.args)
-        push!(expr.args, gen_expr(arg.args[1], :(rest($data, $state)), isconst))
+        push!(expr.args, gen_expr(arg.args[1], :(rest($data, $state)), dec))
       else
         remain = length(p.args) - i
         code = quote
           const temp = rest($data, $state)
-          $(gen_expr(arg.args[1], :(temp[1:end-$remain]), isconst))
+          $(gen_expr(arg.args[1], :(temp[1:end-$remain]), dec))
           tail = temp[end-$remain+1:end]
         end
         for j in 1:remain
-          push!(code.args, gen_expr(p.args[i+j], :(tail[$j]), isconst))
+          push!(code.args, gen_expr(p.args[i+j], :(tail[$j]), dec))
         end
         push!(expr.args, code)
       end
@@ -65,7 +66,7 @@ gen_iteratable(p, data, isconst) = begin
     else
       push!(expr.args, quote
         item, $state = next($data, $state)
-        $(gen_expr(arg, :item, isconst))
+        $(gen_expr(arg, :item, dec))
       end)
     end
   end
@@ -93,16 +94,6 @@ rest(itr, state) = begin
   out
 end
 
-getkey(a, key) = begin
-  a = getkey(a, key, Base.secret_table_token)
-  a ≡ Base.secret_table_token && throw(KeyError(key))
-  return a
-end
-
-getkey(a::Associative, key, default) = get(a, key, default)
-getkey(object, key, default) = isdefined(object, key::Symbol) ? getfield(object, key) : default
-getkey(t::Tuple, i, default) = isdefined(t, i) ? getindex(t, i) : default
-
 macro destruct(expr)
   if @capture(expr, function f_(args__) body_ end | f_(args__)=body_)
     extra = quote end
@@ -110,12 +101,12 @@ macro destruct(expr)
       pattern, T = norm_param(param)
       pattern isa Symbol && continue
       temp = gensym()
-      push!(extra.args, gen_expr(pattern, esc(temp), false))
+      push!(extra.args, gen_expr(pattern, esc(temp), :block))
       args[i] = :($temp::$T)
     end
     :($(esc(f))($(map(esc, args)...)) = ($extra; $(esc(body)))) |> flatten
   elseif @capture(expr, pattern_ = data_)
-    flatten(gen_expr(pattern, esc(data), false))
+    flatten(gen_expr(pattern, esc(data), :block))
   else
     error("unrecognised input: $expr")
   end
