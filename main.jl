@@ -110,5 +110,4 @@ handle_macro(expr, declaration) = begin
 end
 
 @eval macro $:const(expr) handle_macro(expr, :const) end
-@eval macro $:local(expr) handle_macro(expr, :local) end
 @eval macro $:destruct(expr) handle_macro(expr, :block) end
