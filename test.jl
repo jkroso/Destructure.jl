@@ -6,9 +6,9 @@ include("main.jl")
 @destruct {a, tail...} = Dict(:a=>0,:b=>1,:c=>2)
 @test a == 0 && tail == Dict(:b=>1,:c=>2)
 @destruct [_,a,b] = [1,2,3]
-@test a == 2
+@test a == 2 && b == 3
 @destruct [_,tail...] = [1,2,3]
-@test tail == [2,3]
+@test collect(tail) == [2,3]
 @destruct [_,tail...,a] = [1,2,3,4,5]
 @test tail == [2,3,4] && a == 5
 
@@ -16,10 +16,10 @@ include("main.jl")
 @test child == 1 && tail == Dict()
 
 @destruct [[a],[b],tail...] = [[1],[2]]
-@test a == 1 && b == 2 && tail == []
+@test a == 1 && b == 2 && collect(tail) == []
 
 @destruct [{a},[b],tail...] = [Dict(:a=>0),[1]]
-@test a == 0 && b == 1 && tail == []
+@test a == 0 && b == 1 && collect(tail) == []
 
 @destruct {num, den, tail...} = 1//2
 @test num == 1 && den == 2 && tail == Dict()

@@ -44,11 +44,11 @@ gen_iteratable(p, data, dec) = begin
     arg = p.args[i]
     if Meta.isexpr(arg, :...)
       if i == length(p.args)
-        push!(expr.args, gen_expr(arg.args[1], :(rest($data, $state)), dec))
+        push!(expr.args, gen_expr(arg.args[1], :(Iterators.rest($data, $state)), dec))
       else
         remain = length(p.args) - i
         code = quote
-          temp = rest($data, $state)
+          temp = collect(eltype($data), Iterators.rest($data, $state))
           $(gen_expr(arg.args[1], :(temp[1:end-$remain]), dec))
           tail = temp[end-$remain+1:end]
         end
@@ -76,15 +76,6 @@ without(fields, a) = begin
   for f in fieldnames(a)
     f in fields && continue
     out[f] = a.(f)
-  end
-  out
-end
-
-rest(itr, state) = begin
-  out = Vector{eltype(itr)}()
-  while !done(itr, state)
-    value, state = next(itr, state)
-    push!(out, value)
   end
   out
 end
