@@ -3,7 +3,7 @@
 
 gen_expr(p::Expr, data, dec) = begin
   # convert {a,b} => [:a=>a,:b=>b]
-  if Meta.isexpr(p, :cell1d)
+  if Meta.isexpr(p, :braces)
     pairs = map(p.args) do e
       @match e begin
         (s_Symbol)          => :($(QuoteNode(s)) => $s)
@@ -28,7 +28,7 @@ gen_expr(p::Symbol, data, dec) = p == :_ ? nothing : Expr(dec, :($(esc(p)) = $da
 gen_associative(p, data, dec) = begin
   exprs = map(p.args) do arg
     @match arg begin
-      (key_ => pat_ = default_) => gen_expr(pat, :(get($data, $(esc(key)), $(esc(default)))), dec)
+      (key_ => (pat_ = default_)) => gen_expr(pat, :(get($data, $(esc(key)), $(esc(default)))), dec)
       (key_ => pat_) => gen_expr(pat, :(get($data, $(esc(key)))), dec)
       slurp_... => gen_expr(slurp, :(without([$(findnames(p.args)...)], $data)), dec)
       _ => error("unknown format $arg")
@@ -39,41 +39,43 @@ end
 
 gen_iteratable(p, data, dec) = begin
   state = gensym(:state)
-  expr = quote $state = start($data) end
+  out = quote $state = iterate($data) end
   for i in 1:length(p.args)
     arg = p.args[i]
     if Meta.isexpr(arg, :...)
       if i == length(p.args)
-        push!(expr.args, gen_expr(arg.args[1], :(Iterators.rest($data, $state)), dec))
+        push!(out.args, gen_expr(arg.args[1], :($state == nothing ? [] : [$state[1], Iterators.rest($data, $state[2])...]), dec))
       else
         remain = length(p.args) - i
         code = quote
-          temp = collect(eltype($data), Iterators.rest($data, $state))
+          temp = [$state[1], Iterators.rest($data, $state[2])...]
           $(gen_expr(arg.args[1], :(temp[1:end-$remain]), dec))
           tail = temp[end-$remain+1:end]
         end
         for j in 1:remain
           push!(code.args, gen_expr(p.args[i+j], :(tail[$j]), dec))
         end
-        push!(expr.args, code)
+        push!(out.args, code)
       end
       break
     else
-      push!(expr.args, quote
-        (item, $state) = next($data, $state)
+      push!(out.args, quote
+        @assert $state != nothing
+        item = $state[1]
+        $state = iterate($data, $state[2])
         $(gen_expr(arg, :item, dec))
       end)
     end
   end
-  expr
+  out
 end
 
 ispair(p) = Meta.isexpr(p, :call, 3) && p.args[1] == :(=>)
 findnames(args) = map(p->p.args[2], filter(ispair, args))
-without(fields, a::Associative) = filter((k,v)->!(k in fields), a)
+without(fields, a::AbstractDict) = filter(((k,v))->!(k in fields), a)
 without(fields, a) = begin
   out = Dict()
-  for f in fieldnames(a)
+  for f in fieldnames(typeof(a))
     f in fields && continue
     out[f] = a.(f)
   end

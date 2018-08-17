@@ -1,4 +1,4 @@
-using Base.Test
+using Test
 include("main.jl")
 
 @destruct {a} = Dict(:a=>1)
@@ -24,7 +24,7 @@ include("main.jl")
 @destruct {num, den, tail...} = 1//2
 @test num == 1 && den == 2 && tail == Dict()
 
-@destruct [:a=>a=1] = Dict()
+@destruct [:a=>(a=1)] = Dict()
 @test a == 1
 
 @destruct {a=2} = Dict()
@@ -34,4 +34,4 @@ include("main.jl")
 @test destruct(Dict(:a=>1),2) == (1,2)
 
 @const {d, dtail..., :f=>[f]} = Dict(:d=>1,:e=>2,:f=>[3])
-@test d == 1 && dtail == Dict(:e=>2) && f == 3 && isconst(:d) && isconst(:dtail) && isconst(:f)
+@test d == 1 && dtail == Dict(:e=>2) && f == 3 && isconst(@__MODULE__(), :d) && isconst(@__MODULE__(), :dtail) && isconst(@__MODULE__(), :f)
