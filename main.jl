@@ -72,15 +72,9 @@ end
 
 ispair(p) = Meta.isexpr(p, :call, 3) && p.args[1] == :(=>)
 findnames(args) = map(p->p.args[2], filter(ispair, args))
-without(fields, a::AbstractDict) = filter(((k,v))->!(k in fields), a)
-without(fields, a) = begin
-  out = Dict()
-  for f in fieldnames(typeof(a))
-    f in fields && continue
-    out[f] = a.(f)
-  end
-  out
-end
+without(fields, a::AbstractDict) = filter(((k,_),)->!in(k, fields), a)
+without(fields, a) =
+  Dict(f => getproperty(a, f) for f in propertynames(a) if !in(f, fields))
 
 norm_param(e) = Meta.isexpr(e, :(::), 2) ? (e.args[1], e.args[2]) : (e, Any)
 
