@@ -1,4 +1,4 @@
-# Descructure.jl
+# Destructure.jl
 
 Destructuring assignment macros
 
