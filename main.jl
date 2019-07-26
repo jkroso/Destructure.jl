@@ -1,41 +1,35 @@
 @require "github.com/MikeInnes/MacroTools.jl" => MacroTools flatten @capture @match
 @require "github.com/jkroso/Prospects.jl" get
 
-gen_expr(p::Expr, data, dec) = begin
-  # convert {a,b} => [:a=>a,:b=>b]
-  if Meta.isexpr(p, :braces)
-    pairs = map(p.args) do e
-      @match e begin
-        (s_Symbol)          => :($(QuoteNode(s)) => $s)
-        (s_Symbol = value_) => :($(QuoteNode(s)) => $e)
-        _ => e
-      end
-    end
-    p = :([$(pairs...)])
-  end
-  @assert Meta.isexpr(p, :vect)
-  temp = gensym(:data)
-  expr = if any(ispair, p.args)
-    gen_associative(p, temp, dec)
+gen_expr(p::Expr, data, dec, name=toname(p)) = begin
+  expr = if Meta.isexpr(p, :braces)
+    gen_associative(p, name, dec)
+  elseif Meta.isexpr(p, :vect)
+    gen_iteratable(p, name, dec)
   else
-    gen_iteratable(p, temp, dec)
+    error("unknown destructuring pattern: $p")
   end
-  :($temp = $data; $expr)
+  :($name = $data; $expr)
 end
 
-gen_expr(p::Symbol, data, dec) = p == :_ ? nothing : Expr(dec, :($(esc(p)) = $data))
+gen_expr(p::Symbol, data, dec, name=toname(p)) = p == :_ ? nothing : Expr(dec, :($name = $data))
 
 gen_associative(p, data, dec) = begin
   exprs = map(p.args) do arg
     @match arg begin
-      (key_ => (pat_ = default_)) => gen_expr(pat, :(get($data, $(esc(key)), $(esc(default)))), dec)
-      (key_ => pat_) => gen_expr(pat, :(get($data, $(esc(key)))), dec)
-      slurp_... => gen_expr(slurp, :(without([$(findnames(p.args)...)], $data)), dec)
-      _ => error("unknown format $arg")
+      (key_ => (pat_ = default_)) => gen_expr(pat, :(get($data, $(tokey(key)), $(esc(default)))), dec, toname(pat))
+      (key_Symbol => pat_) => gen_expr(pat, :(get($data, $(tokey(key)))), dec, toname(key))
+      (key_ => pat_) => gen_expr(pat, :(get($data, $(tokey(key)))), dec)
+      slurp_... => gen_expr(slurp, :(without([$(findkeys(p.args)...)], $data)), dec)
+      (key_ = default_) => Expr(dec, :($(esc(key)) = get($data, $(QuoteNode(key)), $(esc(default)))))
+      key_ => Expr(dec, :($(esc(key)) = get($data, $(QuoteNode(key)))))
     end
   end
   quote $(exprs...) end
 end
+
+toname(s::Symbol) = esc(s)
+toname(s) = Symbol(string(s))
 
 gen_iteratable(p, data, dec) = begin
   state = gensym(:state)
@@ -70,8 +64,14 @@ gen_iteratable(p, data, dec) = begin
   out
 end
 
-ispair(p) = Meta.isexpr(p, :call, 3) && p.args[1] == :(=>)
-findnames(args) = map(p->p.args[2], filter(ispair, args))
+findkeys(args) = filter(x->x!=nothing, map(tokey, args))
+tokey(arg) = @match arg begin
+  (_...) => nothing
+  (key_Symbol => _) => QuoteNode(key)
+  (key_ => _) => key
+  key_Symbol => QuoteNode(key)
+  key_ => key
+end
 without(fields, a::AbstractDict) = filter(((k,_),)->!in(k, fields), a)
 without(fields, a) =
   Dict(f => getproperty(a, f) for f in propertynames(a) if !in(f, fields))

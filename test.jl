@@ -12,8 +12,10 @@ include("main.jl")
 @destruct [_,tail...,a] = [1,2,3,4,5]
 @test tail == [2,3,4] && a == 5
 
-@destruct {:a=>{child},tail...} = Dict(:a=>Dict(:child=>1))
-@test child == 1 && tail == Dict()
+@destruct {:d=>{child},tail...} = Dict(:d=>Dict(:child=>1))
+@test child == 1 && tail == Dict() && !isdefined(@__MODULE__(), :d)
+@destruct {a=>{child},tail...} = Dict(:a=>Dict(:child=>2))
+@test child == 2 && tail == Dict() && a == Dict(:child=>2)
 
 @destruct [[a],[b],tail...] = [[1],[2]]
 @test a == 1 && b == 2 && collect(tail) == []
@@ -24,7 +26,7 @@ include("main.jl")
 @destruct {num, den, tail...} = 1//2
 @test num == 1 && den == 2 && tail == Dict()
 
-@destruct [:a=>(a=1)] = Dict()
+@destruct {:a=>(a=1)} = Dict()
 @test a == 1
 
 @destruct {a=2} = Dict()
@@ -35,3 +37,6 @@ include("main.jl")
 
 @const {d, dtail..., :f=>[f]} = Dict(:d=>1,:e=>2,:f=>[3])
 @test d == 1 && dtail == Dict(:e=>2) && f == 3 && isconst(@__MODULE__(), :d) && isconst(@__MODULE__(), :dtail) && isconst(@__MODULE__(), :f)
+
+@destruct {"text"=>text} = Dict("text"=>"sometext")
+@test text == "sometext"
