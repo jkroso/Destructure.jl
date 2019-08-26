@@ -40,3 +40,6 @@ include("main.jl")
 
 @destruct {"text"=>text} = Dict("text"=>"sometext")
 @test text == "sometext"
+
+@destruct {e=1, etail...} = Dict(:e=>2,:b=>3)
+@test e == 2 && etail == Dict(:b=>3)

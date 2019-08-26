@@ -68,6 +68,7 @@ findkeys(args) = filter(x->x!=nothing, map(tokey, args))
 tokey(arg) = @match arg begin
   (_...) => nothing
   (key_Symbol => _) => QuoteNode(key)
+  (key_Symbol = _) => QuoteNode(key)
   (key_ => _) => key
   key_Symbol => QuoteNode(key)
   key_ => key
