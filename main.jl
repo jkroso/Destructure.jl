@@ -1,5 +1,5 @@
-@require "github.com/MikeInnes/MacroTools.jl" => MacroTools flatten @capture @match
-@require "github.com/jkroso/Prospects.jl" get
+@use MacroTools: MacroTools, flatten, @capture, @match
+@use "github.com/jkroso/Prospects.jl" get
 
 gen_expr(p::Expr, data, dec, name=toname(p)) = begin
   expr = if Meta.isexpr(p, :braces)
